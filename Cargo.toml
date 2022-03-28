@@ -1,0 +1,19 @@
+[package]
+name = "hive-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+futures = "0.3.18"
+reqwest = "0.11.6"
+ripemd = "0.1.0"
+sha2 = "0.10.0"
+bs58 = "0.4.0"
+secp256k1 = "0.22.1"
+
+[dev-dependencies]
+hex-literal = "0.3.4"
+rand = "0.8.4"
+secp256k1 = { version = "0.22.1", features = ["std", "rand-std"] }
