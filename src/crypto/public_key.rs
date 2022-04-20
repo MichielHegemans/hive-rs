@@ -3,8 +3,9 @@ use secp256k1::{
     ecdsa::Signature,
     Message,
 };
+use secp256k1::ecdsa::RecoverableSignature;
 
-use crate::crypto::{FromWif, IntoWif, ripemd160};
+use crate::crypto::{DEFAULT_ADDRESS_PREFIX, FromWif, IntoWif, ripemd160, sha256};
 
 pub struct PublicKey {
     key: secp256k1::PublicKey,
@@ -12,11 +13,20 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    pub fn verify(&self, message: &Message, signature: &Signature) -> bool {
-        let secp = secp256k1::Secp256k1::new();
+    pub fn from_key(key: secp256k1::PublicKey, prefix: Option<[u8; 3]>) -> Self {
+        Self {
+            key,
+            prefix: prefix.unwrap_or(DEFAULT_ADDRESS_PREFIX),
+        }
+    }
 
-        match secp.verify_ecdsa(&message, &signature, &self.key) {
-            Ok(_) => true,
+    pub fn verify(&self, message: impl AsRef<[u8]>, signature: &RecoverableSignature) -> bool {
+        let secp = secp256k1::Secp256k1::verification_only();
+        let message = sha256(message);
+        let message = Message::from_slice(&message).unwrap();
+
+        match secp.recover_ecdsa(&message, &signature) {
+            Ok(key) => key == self.key,
             Err(_) => false,
         }
     }

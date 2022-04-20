@@ -1,13 +1,27 @@
-use secp256k1::ecdsa::Signature;
+use secp256k1::ecdsa::RecoverableSignature;
+use secp256k1::ffi::{CPtr, recovery as ffi, secp256k1_nonce_function_default};
 use secp256k1::Message;
 
 use crate::crypto::{double_sha256, FromWif, IntoWif, KeyRole, NETWORK_ID, sha256};
-use crate::crypto::public_key::PrivateKeyBuildError;
+use crate::crypto::public_key::{PrivateKeyBuildError, PublicKey};
 
 pub struct PrivateKey {
     key: secp256k1::SecretKey,
     network_id: u8,
     compressed: bool,
+}
+
+/// Implementation check, however the position used is different between the 2 implementations.
+/// Unsure where this difference comes from. Using the dhive one in this case.
+/// https://gitlab.syncad.com/hive/hive/-/blob/master/libraries/fc/src/crypto/elliptic_common.cpp#L176
+/// https://gitlab.syncad.com/hive/dhive/-/blob/master/src/crypto.ts#L131
+fn is_canonical(signature: &RecoverableSignature) -> bool {
+    let (_, sa) = signature.serialize_compact();
+
+    (sa[0] & 0x80 == 0) &&
+        !(sa[0] == 0 && (sa[1] & 0x80 == 0)) &&
+        (sa[32] & 0x80 == 0) &&
+        !(sa[32] == 0 && (sa[33] & 0x80 == 0))
 }
 
 impl FromWif for PrivateKey {
@@ -53,6 +67,7 @@ impl FromWif for PrivateKey {
             x => return Err(PrivateKeyBuildError::InvalidLength(x)),
         }
 
+        // TODO: Figure out how to make NETWORK_ID dynamic
         if network_id != NETWORK_ID {
             return Err(PrivateKeyBuildError::InvalidNetworkId(network_id));
         }
@@ -99,8 +114,7 @@ impl PrivateKey {
         Self { key, network_id, compressed: false }
     }
 
-    #[allow(dead_code)]
-    pub fn from_seed(seed: &str) -> Result<Self, secp256k1::Error> {
+    pub fn from_seed(seed: impl AsRef<[u8]>) -> Result<Self, secp256k1::Error> {
         let key = sha256(seed);
 
         Ok(Self {
@@ -123,22 +137,57 @@ impl PrivateKey {
         Self::from_seed(&seed)
     }
 
-    pub fn sign(&self, message: [u8; secp256k1::constants::MESSAGE_SIZE]) -> Signature {
-        let secp = secp256k1::Secp256k1::new();
-        let message = Message::from_slice(&message).unwrap();
-        secp.sign_ecdsa(&message, &self.key)
+    pub fn create_public(&self, prefix: Option<[u8; 3]>) -> PublicKey {
+        let secp = secp256k1::Secp256k1::signing_only();
+        PublicKey::from_key(
+            secp256k1::PublicKey::from_secret_key(&secp, &self.key),
+            prefix)
+    }
+
+    pub fn sign_ecdsa_canonical(&self, message: impl AsRef<[u8]>) -> RecoverableSignature {
+        let mut secp = secp256k1::Secp256k1::signing_only();
+        let hashed_message = sha256(&message);
+        let wrapped_message = Message::from_slice(&hashed_message).unwrap();
+        let mut attempt: u8 = 0;
+
+        /*
+        This loop is to make sure the signature is canonical, in the hive C++ codebase there are 3
+        types of canonical:
+        - FC
+        - BIP0062
+        - Non canonical
+
+        At the moment we only have FC
+
+        TODO: Add BIP0062 (and Non Canoncial?)
+         */
+        loop {
+            attempt += 1;
+            let mut signature = ffi::RecoverableSignature::new();
+            let data = sha256([message.as_ref(), &[attempt]].concat());
+            unsafe {
+                // TODO: Will crash if the return is not 1.
+                assert_eq!(ffi::secp256k1_ecdsa_sign_recoverable(*secp.ctx(), &mut signature, wrapped_message.as_c_ptr(), self.key.as_c_ptr(), secp256k1_nonce_function_default, data.as_c_ptr() as _), 1);
+            }
+
+            let signature = RecoverableSignature::from(signature);
+            if is_canonical(&signature) {
+                return signature;
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use secp256k1::rand::Rng;
 
     use secp256k1::rand::rngs::OsRng;
     use secp256k1::Secp256k1;
 
     use crate::crypto::{FromWif, IntoWif, sha256};
-    use crate::crypto::private_key::PrivateKey;
+    use crate::crypto::private_key::{is_canonical, PrivateKey};
 
     #[test]
     fn wif_to_private_key() {
@@ -164,19 +213,13 @@ mod tests {
     fn sign_ecdsa() {
         let secp = Secp256k1::new();
         let mut rng = OsRng::new().unwrap();
+        let network_id: u8 = rng.gen();
         let (key, _) = secp.generate_keypair(&mut rng);
-        let key = PrivateKey::from_key(key, 0x80);
+        let key = PrivateKey::from_key(key, network_id);
 
         let message = sha256("Hello dear world");
+        let signature = key.sign_ecdsa_canonical(message);
 
-        let signature = key.sign(message);
-        let sa = signature.serialize_compact();
-
-        let is_canonical = !(sa[0] & 0x80 > 0) &&
-            !(sa[0] == 0 && !(sa[1] & 0x80 > 0)) &&
-            !(sa[32] & 0x80 > 0) &&
-            !(sa[33] == 0 && !(sa[33] & 0x80 > 0));
-
-        assert!(is_canonical);
+        assert!(is_canonical(&signature));
     }
 }

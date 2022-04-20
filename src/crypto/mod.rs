@@ -1,5 +1,5 @@
-mod public_key;
-mod private_key;
+pub mod public_key;
+pub mod private_key;
 
 use ripemd::{Digest, Ripemd160};
 use sha2::Sha256;
@@ -8,7 +8,7 @@ use sha2::Sha256;
 ///
 /// # Arguments
 /// * `input` - Data to hash
-pub fn ripemd160(input: impl AsRef<[u8]>) -> [u8; 20] {
+fn ripemd160(input: impl AsRef<[u8]>) -> [u8; 20] {
     let mut hasher = Ripemd160::new();
     hasher.update(input);
     hasher.finalize().into()
@@ -18,7 +18,7 @@ pub fn ripemd160(input: impl AsRef<[u8]>) -> [u8; 20] {
 ///
 /// # Arguments
 /// * `input` - Data to hash
-pub fn sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
+fn sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
     let mut hasher = Sha256::new();
 
     hasher.update(input);
@@ -29,7 +29,7 @@ pub fn sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
 ///
 /// # Arguments
 /// * `input` - Data to hash
-pub fn double_sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
+fn double_sha256(input: impl AsRef<[u8]>) -> [u8; 32] {
     sha256(sha256(input))
 }
 
@@ -51,3 +51,4 @@ pub enum KeyRole {
 }
 
 pub(crate) const NETWORK_ID: u8 = 0x80;
+pub(crate) const DEFAULT_ADDRESS_PREFIX: [u8; 3] = [b'S', b'T', b'M'];
