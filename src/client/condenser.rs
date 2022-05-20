@@ -1,5 +1,4 @@
-use reqwest::{Error, Response};
-use serde::{Deserialize};
+use reqwest::{Error};
 use crate::chain::block::Block;
 use crate::chain::global_properties::GlobalProperties;
 use crate::client::client::{HiveClient};
@@ -31,6 +30,7 @@ impl CondenserClient {
 */
 #[cfg(test)]
 mod tests {
+    use crate::chain::operation::{Operation};
     use crate::client::condenser::{CondenserClient};
 
     #[tokio::test]
@@ -39,6 +39,18 @@ mod tests {
         let response = client.get_block(64522225).await;
         let block = response.ok().unwrap();
         println!("deserialized = {:?}", block);
+        let (name, operation) = block.transactions.get(0).unwrap().operations.get(0).unwrap();
+        println!("name = {:?}, operation = {:?}", name, operation);
+        assert_eq!(name, "custom_json");
+        match operation {
+            Operation::CustomJson(val) => {
+                println!("{:?}", val.id);
+                println!("{:?}", val.json);
+            },
+            _ => {
+                assert!(false);
+            }
+        };
     }
 
     #[tokio::test]

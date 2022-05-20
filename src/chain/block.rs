@@ -3,13 +3,13 @@ use crate::chain::transaction::Transaction;
 
 #[derive(Debug, Deserialize)]
 pub struct Block {
-    previous: String,
-    timestamp: String,
-    witness: String,
-    transaction_merkle_root: String,
-    witness_signature: String,
-    block_id: String,
-    signing_key: String,
-    transaction_ids: Vec<String>,
-    transactions: Vec<Transaction>,
+    pub previous: String,
+    pub timestamp: String,
+    pub witness: String,
+    pub transaction_merkle_root: String,
+    pub witness_signature: String,
+    pub block_id: String,
+    pub signing_key: String,
+    pub transaction_ids: Vec<String>,
+    pub transactions: Vec<Transaction>,
 }
