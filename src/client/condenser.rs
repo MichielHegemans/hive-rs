@@ -1,7 +1,7 @@
 use reqwest::{Error};
 use crate::chain::block::Block;
 use crate::chain::global_properties::GlobalProperties;
-use crate::client::client::{HiveClient};
+use crate::client::hive_client::{HiveClient};
 
 const GET_BLOCK: &str = "condenser_api.get_block";
 const GET_GLOBAL_PROPERTIES: &str = "condenser_api.get_dynamic_global_properties";
@@ -11,53 +11,16 @@ pub struct CondenserClient {
 }
 
 impl CondenserClient {
-    fn new(hosts: Vec<String>) -> CondenserClient {
-        let hive_client = HiveClient::new(hosts);
+    pub fn new(hosts: Vec<String>) -> CondenserClient {
+        let hive_client = HiveClient::new(hosts, None);
         Self { hive_client }
     }
 
-    async fn get_block(&self, block_num: u32) -> Result<Block, Error> {
-        self.hive_client.post(GET_BLOCK.to_string(), vec![block_num]).await
+    pub async fn get_block(&mut self, block_num: u32) -> Result<Block, Error> {
+        self.hive_client.post(GET_BLOCK.to_string(), Some(vec![block_num])).await
     }
 
-    async fn get_global_properties(&self) -> Result<GlobalProperties, Error> {
-        self.hive_client.post(GET_GLOBAL_PROPERTIES.to_string(), vec![]).await
-    }
-}
-
-/*
-    TODO: These tests should not hit live apis...
-*/
-#[cfg(test)]
-mod tests {
-    use crate::chain::operation::{Operation};
-    use crate::client::condenser::{CondenserClient};
-
-    #[tokio::test]
-    async fn retrieve_block() {
-        let client = CondenserClient::new(vec!["https://api.hive.blog".to_string()]);
-        let response = client.get_block(64522225).await;
-        let block = response.ok().unwrap();
-        println!("deserialized = {:?}", block);
-        let (name, operation) = block.transactions.get(0).unwrap().operations.get(0).unwrap();
-        println!("name = {:?}, operation = {:?}", name, operation);
-        assert_eq!(name, "custom_json");
-        match operation {
-            Operation::CustomJson(val) => {
-                println!("{:?}", val.id);
-                println!("{:?}", val.json);
-            },
-            _ => {
-                assert!(false);
-            }
-        };
-    }
-
-    #[tokio::test]
-    async fn retrieve_properties() {
-        let client = CondenserClient::new(vec!["https://api.hive.blog".to_string()]);
-        let response = client.get_global_properties().await;
-        let properties = response.ok().unwrap();
-        println!("deserialized = {:?}", properties);
+    pub async fn get_global_properties(&mut self) -> Result<GlobalProperties, Error> {
+        self.hive_client.post(GET_GLOBAL_PROPERTIES.to_string(), None).await
     }
 }

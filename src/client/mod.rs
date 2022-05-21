@@ -1,2 +1,2 @@
 pub mod condenser;
-mod client;
+mod hive_client;
