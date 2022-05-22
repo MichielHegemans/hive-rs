@@ -13,7 +13,7 @@ async fn retrieve_block() {
             .header("content-type", "applications/json")
             .body(payload);
     });
-    let mut client = CondenserClient::new(vec![server.base_url()]);
+    let mut client = CondenserClient::new(vec![server.base_url()], None);
     let response = client.get_block(64522225).await;
     let block = response.ok().unwrap();
     for transaction in block.transactions {
@@ -39,7 +39,7 @@ async fn retrieve_properties() {
             .header("content-type", "applications/json")
             .body(payload);
     });
-    let mut client = CondenserClient::new(vec![server.base_url()]);
+    let mut client = CondenserClient::new(vec![server.base_url()], None);
     let response = client.get_global_properties().await;
     let properties = response.ok().unwrap();
     assert_eq!(64551284, properties.head_block_number);

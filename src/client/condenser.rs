@@ -11,8 +11,8 @@ pub struct CondenserClient {
 }
 
 impl CondenserClient {
-    pub fn new(hosts: Vec<String>) -> CondenserClient {
-        let hive_client = HiveClient::new(hosts, None);
+    pub fn new(hosts: Vec<String>, max_retry: Option<u8>) -> CondenserClient {
+        let hive_client = HiveClient::new(hosts, max_retry);
         Self { hive_client }
     }
 
